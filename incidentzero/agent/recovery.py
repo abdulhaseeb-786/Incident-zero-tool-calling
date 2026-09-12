@@ -10,7 +10,6 @@ T = TypeVar("T")
 
 
 class RetryPolicy:
-    def __init__(self, max_attempts: int = 3, sleeper: Callable[[float], None] = time.sleep) -> None:
     def __init__(
         self,
         max_attempts: int = 3,
@@ -24,9 +23,6 @@ class RetryPolicy:
         self.max_delay = max_delay
 
     def call_model(self, fn: Callable[[], T]) -> T:
-        # TODO(A1): bounded retry with backoff for TransientModelError only.
-        # Do not retry PermanentModelError, schema mistakes, or an unsafe tool action.
-        return fn()
         """Execute a model call with bounded retries and exponential backoff for transient errors.
 
         Only TransientModelError (e.g., HTTP 429 or provider timeouts) is retried.
@@ -42,4 +38,3 @@ class RetryPolicy:
                     raise
                 delay = min(self.base_delay * (2 ** (attempts - 1)), self.max_delay)
                 self.sleeper(delay)
-
