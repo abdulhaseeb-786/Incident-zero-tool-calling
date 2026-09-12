@@ -6,46 +6,60 @@
 
 This repository deliberately gives you a **working simulated production environment** and an **incomplete agent runtime**. Your job is not to build an API or a dashboard. Your job is to turn the baseline loop into a reliable agent that can observe, plan, act, verify, re-plan, recover from failures, respect human approval, and stop correctly under a strict budget.
 
-## Quick start
+## Student Submission Information
+
+- **Student Name:** Abdul Haseeb
+- **Roll Number:** 23I-0132
+- **Course:** Agentic Artificial Intelligence (Fall 2026)
+
+## Exact Setup and Run Instructions
+
+### 1. Environment Setup
 
 ```bash
 python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# Linux/macOS: source .venv/bin/activate
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
-copy .env.example .env   # Windows CMD
+```
+
+Set up your `.env` configuration file:
+```bash
+copy .env.example .env   # Windows
 # cp .env.example .env   # Linux/macOS
 ```
+Ensure `GROQ_API_KEY` is set in `.env` or exported in your shell. **Never commit the API key.**
 
-Put your own key in `.env` or set `GROQ_API_KEY` in the shell. **Never submit the key.**
-
-Generate your deterministic public scenario:
-
-```bash
-python scripts/generate_student_scenario.py --student-id 22I-1234 --scenario public-a
-```
-
-Validate the protected infrastructure (does not call Groq):
+### 2. Run Verification & Unit Tests (Offline - No Quota Consumed)
 
 ```bash
+# Infrastructure & Banned Framework Checks
 pytest -q tests/public -m infrastructure
 python scripts/check_banned_imports.py
 python scripts/check_protected_integrity.py
-```
 
-Run the full public test suite while developing:
-
-```bash
+# Full public test suite including all 11 student unit tests:
 pytest -q tests/public
 ```
 
-Several student-requirement tests are expected to fail in the untouched starter. They are specifications, not bugs in the simulator.
-
-Live run with Groq:
+### 3. Generate Scenarios & Run Evaluated Scenarios
 
 ```bash
-python -m incidentzero.cli run --student-id 22I-1234 --scenario public-a --model openai/gpt-oss-20b
+# Generate deterministic public scenarios:
+python scripts/generate_student_scenario.py --student-id 23I-0132 --scenario public-a
+python scripts/generate_student_scenario.py --student-id 23I-0132 --scenario public-b
+python scripts/generate_student_scenario.py --student-id 23I-0132 --scenario public-c
+
+# Live evaluation run (interactive console approval):
+python -m incidentzero.cli run --student-id 23I-0132 --scenario public-a
+
+# Automated non-interactive run (auto-approve high/critical actions):
+python -m incidentzero.cli run --student-id 23I-0132 --scenario public-a --auto-approve
 ```
+
 
 ## Stable contract
 

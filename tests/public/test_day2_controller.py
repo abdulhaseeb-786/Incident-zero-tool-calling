@@ -265,3 +265,100 @@ def test_graceful_budget_exhaustion_safe_escalation(tmp_path):
 
     assert outcome.status == "escalated"
     assert "budget" in outcome.summary.lower()
+
+
+@pytest.mark.student
+def test_retry_exhaustion_raises_transient_error():
+    """TransientModelError must re-raise after max_attempts are exhausted."""
+    from incidentzero.agent.recovery import RetryPolicy
+    from incidentzero.model.errors import TransientModelError
+
+    sleeps = []
+    retry = RetryPolicy(max_attempts=3, sleeper=lambda s: sleeps.append(s))
+    calls = {"n": 0}
+
+    def always_fails():
+        calls["n"] += 1
+        raise TransientModelError("Simulated persistent 429")
+
+    with pytest.raises(TransientModelError):
+        retry.call_model(always_fails)
+
+    assert calls["n"] == 3
+    assert len(sleeps) == 2
+
+
+@pytest.mark.student
+def test_replan_triggered_when_verification_fails(tmp_path):
+    """When verify_recovery reports criteria_met=False, controller must trigger plan revision."""
+    decisions = [
+        ModelReply(
+            content="Testing verification before incident is resolved.",
+            tool_calls=[ToolCall(id="c1", name="verify_recovery", arguments={})],
+        ),
+        ModelReply(
+            content="Verification failed as expected; escalating with evidence.",
+            tool_calls=[
+                ToolCall(
+                    id="c2",
+                    name="escalate_incident",
+                    arguments={"reason": "Verification failed; escalating.", "evidence_ids": ["EV-0001"]},
+                )
+            ],
+        ),
+    ]
+
+    controller, _ = make_controller(tmp_path, decisions)
+    outcome = controller.run()
+
+    assert outcome.status == "escalated"
+    assert controller.state.plan is not None
+    assert controller.state.plan.revision >= 1
+
+
+@pytest.mark.student
+def test_unknown_tool_rejected_at_boundary(tmp_path):
+    """Invented or non-existent tools must be rejected at validation boundary."""
+    decisions = [
+        ModelReply(
+            content="Calling a hallucinatory tool.",
+            tool_calls=[ToolCall(id="c1", name="invented_cluster_reboot", arguments={"force": True})],
+        ),
+        ModelReply(
+            content="Escalating after tool rejection.",
+            tool_calls=[
+                ToolCall(
+                    id="c2",
+                    name="escalate_incident",
+                    arguments={"reason": "Tool rejected; escalating safely.", "evidence_ids": ["EV-0001"]},
+                )
+            ],
+        ),
+    ]
+
+    controller, _ = make_controller(tmp_path, decisions)
+    outcome = controller.run()
+
+    assert outcome.status == "escalated"
+    val_err = [r for r in controller.state.last_tool_results if r.get("status") == "validation_error"]
+    assert len(val_err) >= 1
+    assert "Unknown tool" in val_err[0]["message"]
+
+
+@pytest.mark.student
+def test_model_text_without_tools_fails_gracefully(tmp_path):
+    """Model returning natural-language claim without tools must result in failed outcome, not false resolution."""
+    decisions = [
+        ModelReply(
+            content="I have investigated and the checkout service is completely fixed and healthy!",
+            tool_calls=[],
+        )
+    ]
+
+    controller, _ = make_controller(tmp_path, decisions)
+    outcome = controller.run()
+
+    assert outcome.status == "failed"
+    assert "natural language" in outcome.summary.lower()
+
+

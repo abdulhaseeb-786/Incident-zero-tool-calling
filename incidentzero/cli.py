@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from rich import print
 
 from incidentzero.agent.controller import AgentController
-from incidentzero.approval.gateway import ConsoleApprovalGateway
+from incidentzero.approval.gateway import AlwaysApproveGateway, ConsoleApprovalGateway
 from incidentzero.environment.engine import SimulationEnvironment
 from incidentzero.model.groq_client import GroqModelClient
 from incidentzero.telemetry.budget import BudgetManager
@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--student-id", required=True)
     run.add_argument("--scenario", default="public-a")
     run.add_argument("--model", default=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"))
+    run.add_argument("--auto-approve", action="store_true", help="Automatically approve high/critical actions")
     return parser
 
 
@@ -35,13 +36,15 @@ def main() -> None:
         env = SimulationEnvironment(args.student_id, args.scenario)
         registry = ToolRegistry(env)
         trace_path = Path("traces") / f"{args.student_id}_{args.scenario}.jsonl"
+        approval = AlwaysApproveGateway() if getattr(args, "auto_approve", False) else ConsoleApprovalGateway()
         controller = AgentController(
             model=GroqModelClient(model=args.model),
             tools=registry,
-            approval=ConsoleApprovalGateway(),
+            approval=approval,
             budget=BudgetManager(),
             trace=TraceRecorder(trace_path),
         )
+
         outcome = controller.run()
         print("\n[bold]Outcome[/bold]")
         print(json.dumps(asdict(outcome), indent=2, default=str))
