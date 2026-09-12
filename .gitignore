@@ -6,6 +6,7 @@ __pycache__/
 *.pyo
 *.log
 traces/*.jsonl
+!traces/23I-0132_public-*.jsonl
 artifacts/
 .DS_Store
 incidentzero_starter.zip
